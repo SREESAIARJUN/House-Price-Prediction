@@ -17,10 +17,21 @@ except Exception as e:
     logging.error(f"Error loading model: {e}")
     raise RuntimeError("Failed to load model")
 
+# Load the feature scaler (for scaling X inputs)
+try:
+    with open("scaler_X.pkl", "rb") as f:
+        scaler_X = pickle.load(f)
+    logging.info("Scaler loaded successfully.")
+except Exception as e:
+    logging.error(f"Error loading scaler: {e}")
+    raise RuntimeError("Failed to load scaler")
+
 # Define FastAPI app
-app = FastAPI(title="House Price Prediction API",
-              description="Predict house prices based on given features",
-              version="1.0")
+app = FastAPI(
+    title="House Price Prediction API",
+    description="Predict house prices based on given features",
+    version="1.0"
+)
 
 # Input schema
 class HouseFeatures(BaseModel):
@@ -48,9 +59,16 @@ def predict_price(features: HouseFeatures):
         # Ensure correct dtype
         data = data.astype(float)
 
-        # Make prediction
-        prediction = model.predict(data)
-        return {"predicted_price": float(prediction[0])}
+        # Scale the input features using the loaded scaler
+        scaled_input = scaler_X.transform(data)
+
+        # Make prediction on the scaled data
+        prediction_units = model.predict(scaled_input)[0]
+        
+        # Convert prediction to actual dollars (California Housing target is in 100,000 units)
+        predicted_price = prediction_units * 100000
+
+        return {"predicted_price": predicted_price}
 
     except Exception as e:
         logging.error(f"Prediction error: {e}")
