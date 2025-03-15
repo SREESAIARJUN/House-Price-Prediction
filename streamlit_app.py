@@ -6,10 +6,10 @@ import json
 API_URL = "https://house-price-prediction-oo91.onrender.com/predict"
 
 # Streamlit UI Configuration
-st.set_page_config(page_title="House Price Prediction", page_icon="🏡", layout="centered")
+st.set_page_config(page_title="California House Price Prediction", page_icon="🏡", layout="centered")
 
 # App Title
-st.title("🏡 House Price Prediction")
+st.title("🏡 California House Price Prediction")
 st.markdown("Enter the house details below to get a predicted price.")
 
 # Sidebar for Input Features
