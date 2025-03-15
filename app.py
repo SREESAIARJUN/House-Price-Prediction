@@ -1,61 +1,29 @@
 import os
 import logging
-import joblib  # For loading compressed model and scaler
 import pandas as pd
 import numpy as np
-import requests
+import onnxruntime as rt  # For ONNX inference
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-
-# Import gdown to download files from Google Drive
-try:
-    import gdown
-except ImportError:
-    raise ImportError("gdown is required to download the model from Google Drive. Install it via 'pip install gdown'.")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Define file paths
-MODEL_PATH = "house_price_model_compressed.pkl"
-SCALER_X_PATH = "scaler_X.pkl"   # This file is stored on GitHub
+# Define file path for the ONNX model (stored locally in your repo)
+MODEL_PATH = "model.onnx"
 
-# Google Drive direct download URL for the compressed model file.
-# Provided link: https://drive.google.com/file/d/1huYgFS6yUleTzl5WJaHLjKOfCR7f-WDy/view?usp=sharing
-# Converted to direct download URL:
-MODEL_URL = "https://drive.google.com/uc?export=download&id=1huYgFS6yUleTzl5WJaHLjKOfCR7f-WDy"
-
-# Download the compressed model file using gdown if it does not exist locally
-if not os.path.exists(MODEL_PATH):
-    try:
-        logging.info("Downloading compressed model from Google Drive using gdown...")
-        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
-        logging.info("Compressed model downloaded successfully.")
-    except Exception as e:
-        logging.error(f"Failed to download model: {e}")
-        raise RuntimeError("Failed to download compressed model.")
-
-# Load the compressed model using joblib
+# Load the ONNX model using onnxruntime
 try:
-    model = joblib.load(MODEL_PATH)
-    logging.info("Compressed model loaded successfully.")
+    session = rt.InferenceSession(MODEL_PATH)
+    logging.info("ONNX model loaded successfully.")
 except Exception as e:
-    logging.error(f"Error loading model: {e}")
-    raise RuntimeError("Failed to load compressed model.")
-
-# Load the feature scaler (scaler_X) from local repository (stored on GitHub)
-try:
-    with open(SCALER_X_PATH, "rb") as f:
-        scaler_X = joblib.load(f)
-    logging.info("Feature scaler (scaler_X) loaded successfully.")
-except Exception as e:
-    logging.error(f"Error loading feature scaler: {e}")
-    raise RuntimeError("Failed to load feature scaler")
+    logging.error(f"Error loading ONNX model: {e}")
+    raise RuntimeError("Failed to load ONNX model.")
 
 # Define FastAPI app
 app = FastAPI(
     title="House Price Prediction API",
-    description="Predict house prices based on given features",
+    description="Predict house prices based on given features using an ONNX model (no scaler)",
     version="1.0"
 )
 
@@ -75,7 +43,7 @@ class HouseFeatures(BaseModel):
 def home():
     return {"message": "House Price Prediction API is running! Use /docs for Swagger UI."}
 
-# Prediction endpoint
+# Prediction endpoint using ONNX inference (no scaler applied)
 @app.post("/predict")
 def predict_price(features: HouseFeatures):
     try:
@@ -83,15 +51,17 @@ def predict_price(features: HouseFeatures):
         data = pd.DataFrame([features.dict().values()], columns=features.dict().keys())
         data = data.astype(float)
 
-        # Scale the input features using the loaded scaler_X
-        scaled_input = scaler_X.transform(data)
+        # ONNX Runtime requires input as a numpy array of type float32
+        input_array = data.to_numpy().astype(np.float32)
+        input_name = session.get_inputs()[0].name
 
-        # Predict using the scaled input.
-        # The model output is assumed to be in units of 100,000 dollars.
-        prediction_units = model.predict(scaled_input)[0]
+        # Run inference using ONNX Runtime
+        pred_onx = session.run(None, {input_name: input_array})
+        prediction_units = pred_onx[0][0]
 
-        # Convert prediction to actual dollars
-        predicted_price = prediction_units * 100000
+        # Convert prediction to actual dollars.
+        # (Assuming the model output is in units of 100,000 dollars)
+        predicted_price = float(prediction_units) * 100000
 
         return {"predicted_price": predicted_price}
 
