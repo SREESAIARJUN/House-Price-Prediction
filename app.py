@@ -1,8 +1,9 @@
 import os
 import logging
-import pickle
+import joblib  # For loading compressed model and scaler
 import pandas as pd
 import numpy as np
+import requests
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -16,35 +17,36 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Define file paths
-MODEL_PATH = "house_price_model.pkl"
-SCALER_X_PATH = "scaler_X.pkl"  # This file is small and stored on GitHub
+MODEL_PATH = "house_price_model_compressed.pkl"
+SCALER_X_PATH = "scaler_X.pkl"   # This file is stored on GitHub
 
-# Google Drive direct download URL for the model file (using gdown format)
-MODEL_URL = "https://drive.google.com/uc?export=download&id=1rYn4wRbG-FRty0UIAVZG_ek0BLrJ9b2L"
+# Google Drive direct download URL for the compressed model file.
+# Provided link: https://drive.google.com/file/d/1huYgFS6yUleTzl5WJaHLjKOfCR7f-WDy/view?usp=sharing
+# Converted to direct download URL:
+MODEL_URL = "https://drive.google.com/uc?export=download&id=1huYgFS6yUleTzl5WJaHLjKOfCR7f-WDy"
 
-# Download the model file using gdown if it does not exist locally
+# Download the compressed model file using gdown if it does not exist locally
 if not os.path.exists(MODEL_PATH):
     try:
-        logging.info("Downloading model from Google Drive using gdown...")
+        logging.info("Downloading compressed model from Google Drive using gdown...")
         gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
-        logging.info("Model downloaded successfully.")
+        logging.info("Compressed model downloaded successfully.")
     except Exception as e:
         logging.error(f"Failed to download model: {e}")
-        raise RuntimeError("Failed to download model.")
+        raise RuntimeError("Failed to download compressed model.")
 
-# Load the trained model
+# Load the compressed model using joblib
 try:
-    with open(MODEL_PATH, "rb") as f:
-        model = pickle.load(f)
-    logging.info("Model loaded successfully.")
+    model = joblib.load(MODEL_PATH)
+    logging.info("Compressed model loaded successfully.")
 except Exception as e:
     logging.error(f"Error loading model: {e}")
-    raise RuntimeError("Failed to load model")
+    raise RuntimeError("Failed to load compressed model.")
 
-# Load the feature scaler (scaler_X) from local repo (small file on GitHub)
+# Load the feature scaler (scaler_X) from local repository (stored on GitHub)
 try:
     with open(SCALER_X_PATH, "rb") as f:
-        scaler_X = pickle.load(f)
+        scaler_X = joblib.load(f)
     logging.info("Feature scaler (scaler_X) loaded successfully.")
 except Exception as e:
     logging.error(f"Error loading feature scaler: {e}")
@@ -84,7 +86,8 @@ def predict_price(features: HouseFeatures):
         # Scale the input features using the loaded scaler_X
         scaled_input = scaler_X.transform(data)
 
-        # Predict using the scaled input. The model output is in units of 100,000 dollars.
+        # Predict using the scaled input.
+        # The model output is assumed to be in units of 100,000 dollars.
         prediction_units = model.predict(scaled_input)[0]
 
         # Convert prediction to actual dollars
