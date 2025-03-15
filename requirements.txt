@@ -5,3 +5,4 @@ pandas
 numpy
 joblib
 xgboost==2.1.4
+requests
