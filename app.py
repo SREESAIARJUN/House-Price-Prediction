@@ -1,33 +1,32 @@
 import os
-import requests
+import logging
 import pickle
 import pandas as pd
 import numpy as np
-import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+# Import gdown to download files from Google Drive
+try:
+    import gdown
+except ImportError:
+    raise ImportError("gdown is required to download the model from Google Drive. Install it via 'pip install gdown'.")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Define file paths
 MODEL_PATH = "house_price_model.pkl"
-SCALER_X_PATH = "scaler_X.pkl"   # on GitHub
-# scaler_Y is on GitHub (if needed) but not used in this approach
+SCALER_X_PATH = "scaler_X.pkl"  # This file is small and stored on GitHub
 
-# Google Drive direct download URL for the model file
+# Google Drive direct download URL for the model file (using gdown format)
 MODEL_URL = "https://drive.google.com/uc?export=download&id=1rYn4wRbG-FRty0UIAVZG_ek0BLrJ9b2L"
 
-# Download the model file from Google Drive if it does not exist locally
+# Download the model file using gdown if it does not exist locally
 if not os.path.exists(MODEL_PATH):
     try:
-        logging.info("Downloading model from Google Drive...")
-        response = requests.get(MODEL_URL, stream=True)
-        response.raise_for_status()
-        with open(MODEL_PATH, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
+        logging.info("Downloading model from Google Drive using gdown...")
+        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
         logging.info("Model downloaded successfully.")
     except Exception as e:
         logging.error(f"Failed to download model: {e}")
